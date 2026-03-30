@@ -23,6 +23,8 @@
   --text-muted: #484868;
   --text-link: #7c7cff;
 
+  --bg-input: #14141f;
+
   --accent-primary: #6c63ff;
   --accent-secondary: #8b83ff;
   --accent-glow: rgba(108, 99, 255, 0.25);
@@ -98,6 +100,8 @@
   --text-tertiary: #8888a0;
   --text-muted: #aaaabc;
   --text-link: #5b52e0;
+
+  --bg-input: #ffffff;
 
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-medium: rgba(0, 0, 0, 0.1);

@@ -44,6 +44,14 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // Debugging: Forward renderer console logs to main process console
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[RENDERER] ${message} (at ${sourceId}:${line})`);
+  });
+
+  // Open DevTools by default for debugging
+  mainWindow.webContents.openDevTools();
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

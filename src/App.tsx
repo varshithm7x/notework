@@ -16,6 +16,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { StatusBar } from './components/StatusBar';
 import { WelcomeScreen } from './components/WelcomeScreen';
+import { Modal } from './components/Modal';
 import { Tab, ViewMode, Theme, Command, FileEntry } from './types';
 import { getNoteName, generateId, debounce } from './utils/helpers';
 import { getAPI } from './utils/api';
@@ -39,6 +40,15 @@ export default function App() {
   const [currentContent, setCurrentContent] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
   const [backlinks, setBacklinks] = useState<string[]>([]);
+
+  // ── Modal State ─────────────────────────────────────
+  const [modal, setModal] = useState<{
+    type: 'prompt' | 'confirm';
+    title: string;
+    message: string;
+    defaultValue?: string;
+    onConfirm?: (result: string | boolean) => void;
+  } | null>(null);
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,14 +127,19 @@ export default function App() {
 
   // ── Vault Operations ────────────────────────────────
   const handleOpenVault = async () => {
-    const path = await api.openVaultDialog();
-    if (path) {
-      await api.setVaultPath(path);
-      setVaultPath(path);
-      setTabs([]);
-      setActiveTabId(null);
-      setCurrentContent('');
-      await refreshFileTree();
+    try {
+      const path = await api.openVaultDialog();
+      if (path) {
+        await api.setVaultPath(path);
+        setVaultPath(path);
+        setTabs([]);
+        setActiveTabId(null);
+        setCurrentContent('');
+        await refreshFileTree();
+      }
+    } catch (e) {
+      console.error('Failed to open vault:', e);
+      alert('Failed to open vault. It may be too large or inaccessible.');
     }
   };
 
@@ -168,15 +183,21 @@ export default function App() {
   const handleNewNote = async () => {
     if (!vaultPath) return;
 
-    const name = prompt('Enter note name:');
-    if (!name) return;
+    setModal({
+      type: 'prompt',
+      title: 'New Note',
+      message: 'Enter note name:',
+      onConfirm: async (name) => {
+        if (!name) return;
 
-    const fileName = name.endsWith('.md') ? name : `${name}.md`;
-    const content = `# ${name.replace('.md', '')}\n\n`;
+        const fileName = name.endsWith('.md') ? name : `${name}.md`;
+        const content = `# ${name.replace('.md', '')}\n\n`;
 
-    await api.createFile(fileName, content);
-    await refreshFileTree();
-    await openFile(fileName);
+        await api.createFile(fileName, content);
+        await refreshFileTree();
+        await openFile(fileName);
+      },
+    });
   };
 
   const handleSave = async () => {
@@ -284,14 +305,21 @@ export default function App() {
 
   // ── File Management ─────────────────────────────────
   const handleDeleteFile = async (filePath: string) => {
-    if (!confirm(`Delete "${getNoteName(filePath)}"?`)) return;
-    await api.deleteFile(filePath);
-    
-    // Close tab if open
-    const tab = tabs.find(t => t.path === filePath);
-    if (tab) closeTab(tab.id);
-    
-    await refreshFileTree();
+    setModal({
+      type: 'confirm',
+      title: 'Delete File',
+      message: `Delete "${getNoteName(filePath)}"?`,
+      onConfirm: async (confirmed) => {
+        if (!confirmed) return;
+        await api.deleteFile(filePath);
+        
+        // Close tab if open
+        const tab = tabs.find(t => t.path === filePath);
+        if (tab) closeTab(tab.id);
+        
+        await refreshFileTree();
+      },
+    });
   };
 
   const handleRenameFile = async (oldPath: string, newName: string) => {
@@ -309,12 +337,18 @@ export default function App() {
   };
 
   const handleCreateFolder = async (parentPath: string) => {
-    const name = prompt('Enter folder name:');
-    if (!name) return;
-    
-    const folderPath = parentPath ? `${parentPath}/${name}` : name;
-    await api.createDirectory(folderPath);
-    await refreshFileTree();
+    setModal({
+      type: 'prompt',
+      title: 'New Folder',
+      message: 'Enter folder name:',
+      onConfirm: async (name) => {
+        if (!name) return;
+        
+        const folderPath = parentPath ? `${parentPath}/${name}` : name;
+        await api.createDirectory(folderPath);
+        await refreshFileTree();
+      },
+    });
   };
 
   const handleCreateDailyNote = async () => {
@@ -424,6 +458,19 @@ export default function App() {
         <CommandPalette
           commands={commands}
           onClose={() => setShowCommandPalette(false)}
+        />
+      )}
+
+      {modal && (
+        <Modal
+          type={modal.type}
+          title={modal.title}
+          message={modal.message}
+          defaultValue={modal.defaultValue}
+          onClose={(result) => {
+            setModal(null);
+            modal.onConfirm?.(result);
+          }}
         />
       )}
     </div>

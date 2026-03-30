@@ -65,22 +65,25 @@ export class FileSystemManager {
     const result: FileEntry[] = [];
 
     for (const entry of entries) {
-      // Skip hidden files and system directories
-      if (entry.name.startsWith('.')) continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
 
       const relativePath = path.join(dirPath, entry.name);
       const absolutePath = path.join(absoluteDir, entry.name);
-      const stats = await fs.promises.stat(absolutePath);
-
-      result.push({
-        name: entry.name,
-        path: relativePath,
-        absolutePath,
-        isDirectory: entry.isDirectory(),
-        extension: path.extname(entry.name),
-        modifiedAt: stats.mtimeMs,
-        size: stats.size,
-      });
+      
+      try {
+        const stats = await fs.promises.stat(absolutePath);
+        result.push({
+          name: entry.name,
+          path: relativePath,
+          absolutePath,
+          isDirectory: entry.isDirectory(),
+          extension: path.extname(entry.name),
+          modifiedAt: stats.mtimeMs,
+          size: stats.size,
+        });
+      } catch (e) {
+        console.warn('Skipping file due to stat error:', absolutePath);
+      }
     }
 
     // Sort: directories first, then files alphabetically
@@ -312,7 +315,7 @@ export class FileSystemManager {
     const files: string[] = [];
 
     for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
       
       const relativePath = dirPath ? path.join(dirPath, entry.name) : entry.name;
       
