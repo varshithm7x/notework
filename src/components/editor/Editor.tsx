@@ -1,0 +1,339 @@
+/**
+ * Editor - Main Markdown Editing Component
+ * 
+ * Features:
+ * - CodeMirror 6 for the editor with markdown syntax highlighting
+ * - Live markdown preview using the `marked` library
+ * - Split view showing both editor and preview
+ * - Tab management for multiple open notes
+ * - Wiki-link [[link]] support in both editor and preview
+ */
+
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { EditorState } from '@codemirror/state';
+import { EditorView, keymap, ViewUpdate, Decoration, DecorationSet, ViewPlugin, WidgetType } from '@codemirror/view';
+import { defaultKeymap, indentWithTab, history, historyKeymap } from '@codemirror/commands';
+import { markdown } from '@codemirror/lang-markdown';
+import { oneDark } from '@codemirror/theme-one-dark';
+import { searchKeymap } from '@codemirror/search';
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { Tab, ViewMode } from '../../types';
+import { MarkdownPreview } from './MarkdownPreview';
+
+interface EditorProps {
+  tabs: Tab[];
+  activeTabId: string;
+  content: string;
+  viewMode: ViewMode;
+  onTabSelect: (id: string) => void;
+  onTabClose: (id: string) => void;
+  onContentChange: (content: string) => void;
+  onViewModeChange: (mode: ViewMode) => void;
+  onLinkClick: (linkName: string) => void;
+}
+
+/**
+ * CodeMirror plugin to highlight [[wiki-links]] in the editor.
+ * Creates decorations for text matching the [[...]] pattern.
+ */
+function wikiLinkPlugin(onLinkClick: (name: string) => void) {
+  return ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.buildDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = this.buildDecorations(update.view);
+      }
+    }
+
+    buildDecorations(view: EditorView): DecorationSet {
+      const decorations: any[] = [];
+      const doc = view.state.doc;
+
+      for (let i = 1; i <= doc.lines; i++) {
+        const line = doc.line(i);
+        const regex = /\[\[([^\]]+)\]\]/g;
+        let match;
+
+        while ((match = regex.exec(line.text)) !== null) {
+          const from = line.from + match.index;
+          const to = from + match[0].length;
+
+          decorations.push(
+            Decoration.mark({
+              class: 'cm-wikilink',
+              attributes: {
+                'data-link': match[1],
+                title: `Open: ${match[1]}`,
+              },
+            }).range(from, to)
+          );
+        }
+      }
+
+      return Decoration.set(decorations, true);
+    }
+  }, {
+    decorations: v => v.decorations,
+    eventHandlers: {
+      click: (e: MouseEvent, view: EditorView) => {
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('cm-wikilink') || target.closest('.cm-wikilink')) {
+          const linkEl = target.classList.contains('cm-wikilink') ? target : target.closest('.cm-wikilink') as HTMLElement;
+          const linkName = linkEl?.getAttribute('data-link');
+          if (linkName && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            onLinkClick(linkName);
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * CodeMirror plugin to highlight #tags in the editor.
+ */
+function tagPlugin() {
+  return ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.buildDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = this.buildDecorations(update.view);
+      }
+    }
+
+    buildDecorations(view: EditorView): DecorationSet {
+      const decorations: any[] = [];
+      const doc = view.state.doc;
+
+      for (let i = 1; i <= doc.lines; i++) {
+        const line = doc.line(i);
+        const regex = /(?:^|\s)(#[a-zA-Z][a-zA-Z0-9_-]*)/g;
+        let match;
+
+        while ((match = regex.exec(line.text)) !== null) {
+          const tagStart = line.from + match.index + (match[0].startsWith(' ') ? 1 : 0);
+          const tagEnd = tagStart + match[1].length;
+
+          decorations.push(
+            Decoration.mark({ class: 'cm-tag-mark' }).range(tagStart, tagEnd)
+          );
+        }
+      }
+
+      return Decoration.set(decorations, true);
+    }
+  }, {
+    decorations: v => v.decorations,
+  });
+}
+
+export function Editor({
+  tabs, activeTabId, content, viewMode,
+  onTabSelect, onTabClose, onContentChange,
+  onViewModeChange, onLinkClick
+}: EditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const contentRef = useRef(content);
+
+  // Keep contentRef in sync
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  // Initialize/update CodeMirror
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    // If view already exists, just update content
+    if (viewRef.current) {
+      const currentDoc = viewRef.current.state.doc.toString();
+      if (currentDoc !== content) {
+        viewRef.current.dispatch({
+          changes: {
+            from: 0,
+            to: currentDoc.length,
+            insert: content,
+          },
+        });
+      }
+      return;
+    }
+
+    // Create new editor view
+    const state = EditorState.create({
+      doc: content,
+      extensions: [
+        history(),
+        markdown(),
+        syntaxHighlighting(defaultHighlightStyle),
+        oneDark,
+        keymap.of([
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...searchKeymap,
+          indentWithTab,
+        ]),
+        EditorView.updateListener.of((update: ViewUpdate) => {
+          if (update.docChanged) {
+            const newContent = update.state.doc.toString();
+            contentRef.current = newContent;
+            onContentChange(newContent);
+          }
+        }),
+        EditorView.lineWrapping,
+        wikiLinkPlugin(onLinkClick),
+        tagPlugin(),
+        EditorView.theme({
+          '&': {
+            height: '100%',
+          },
+          '.cm-scroller': {
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '14px',
+            padding: '24px',
+            lineHeight: '1.75',
+          },
+          '.cm-content': {
+            maxWidth: '800px',
+            margin: '0 auto',
+          },
+          '.cm-gutters': {
+            display: 'none',
+          },
+          '&.cm-focused': {
+            outline: 'none',
+          },
+        }),
+      ],
+    });
+
+    const view = new EditorView({
+      state,
+      parent: editorRef.current,
+    });
+
+    viewRef.current = view;
+
+    return () => {
+      view.destroy();
+      viewRef.current = null;
+    };
+  }, [activeTabId]); // Re-create when tab changes
+
+  // Update content when it changes externally (tab switch)
+  useEffect(() => {
+    if (viewRef.current) {
+      const currentDoc = viewRef.current.state.doc.toString();
+      if (currentDoc !== content) {
+        viewRef.current.dispatch({
+          changes: {
+            from: 0,
+            to: currentDoc.length,
+            insert: content,
+          },
+        });
+      }
+    }
+  }, [content]);
+
+  return (
+    <>
+      {/* Tab Bar */}
+      <div className="editor-tab-bar">
+        {tabs.map(tab => (
+          <div
+            key={tab.id}
+            className={`editor-tab ${tab.id === activeTabId ? 'active' : ''}`}
+            onClick={() => onTabSelect(tab.id)}
+          >
+            <span style={{ opacity: 0.5, marginRight: '4px' }}>
+              {tab.isModified ? '●' : ''}
+            </span>
+            {tab.name}
+            <button
+              className="close-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTabClose(tab.id);
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Editor Header with View Mode Toggle */}
+      <div className="editor-header">
+        <div className="editor-breadcrumb">
+          <span>vault</span>
+          <span className="separator">/</span>
+          <span className="current">
+            {tabs.find(t => t.id === activeTabId)?.name || ''}
+          </span>
+        </div>
+
+        <div className="editor-actions">
+          <div className="view-mode-toggle">
+            <button
+              className={`view-mode-btn ${viewMode === 'editor' ? 'active' : ''}`}
+              onClick={() => onViewModeChange('editor')}
+            >
+              Edit
+            </button>
+            <button
+              className={`view-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
+              onClick={() => onViewModeChange('split')}
+            >
+              Split
+            </button>
+            <button
+              className={`view-mode-btn ${viewMode === 'preview' ? 'active' : ''}`}
+              onClick={() => onViewModeChange('preview')}
+            >
+              Read
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Editor & Preview Container */}
+      <div className="editor-container" style={{
+        display: 'flex',
+        gap: viewMode === 'split' ? '1px' : 0,
+      }}>
+        {(viewMode === 'editor' || viewMode === 'split') && (
+          <div
+            ref={editorRef}
+            style={{
+              flex: 1,
+              overflow: 'auto',
+              borderRight: viewMode === 'split' ? '1px solid var(--border-subtle)' : 'none',
+            }}
+          />
+        )}
+
+        {(viewMode === 'preview' || viewMode === 'split') && (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <MarkdownPreview
+              content={content}
+              onLinkClick={onLinkClick}
+            />
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

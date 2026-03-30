@@ -1,0 +1,405 @@
+/**
+ * Electron API Mock
+ * 
+ * Provides a browser-compatible mock of the Electron API for development
+ * and testing outside of Electron. Uses localStorage and in-memory storage
+ * to simulate vault operations.
+ */
+
+import type { ElectronAPI } from '../../electron/preload';
+
+// In-memory file system for browser mode
+const mockFiles: Record<string, string> = {};
+let mockVaultPath: string | null = null;
+
+const SAMPLE_NOTES: Record<string, string> = {
+  'Welcome.md': `# Welcome to Notework
+
+Notework is your **local-first knowledge management tool**. Think of it as a second brain — all your notes, connected.
+
+## Getting Started
+
+1. Create notes using the sidebar or \`Ctrl+N\`
+2. Link notes using \`[[Note Name]]\` syntax — like this: [[Getting Started]]
+3. View your knowledge graph with \`Ctrl+G\`
+4. Search across all notes with \`Ctrl+F\`
+5. Use the command palette with \`Ctrl+P\`
+
+## Features
+
+- ✅ Markdown editing with live preview
+- ✅ [[Wiki Links]] for connecting ideas
+- ✅ Interactive graph visualization
+- ✅ Tags with #welcome #introduction
+
+Check out [[Getting Started]] to learn more, or explore [[Markdown Guide]] for formatting.
+`,
+  'Getting Started.md': `# Getting Started
+
+Welcome to your Notework vault! Here's everything you need to know.
+
+## Creating Notes
+
+- Click the ✚ button in the sidebar
+- Use \`Ctrl+N\` keyboard shortcut
+- Click on a [[Wiki Links|broken wiki link]] to auto-create a note
+
+## Linking Notes
+
+The power of Notework lies in connecting your ideas:
+
+\`\`\`
+[[Note Name]]
+\`\`\`
+
+This creates a bidirectional link. The linked note will show this note in its **Backlinks** panel.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| \`Ctrl+N\` | New Note |
+| \`Ctrl+S\` | Save |
+| \`Ctrl+F\` | Search |
+| \`Ctrl+G\` | Graph View |
+| \`Ctrl+P\` | Command Palette |
+| \`Ctrl+B\` | Toggle Sidebar |
+
+## Next Steps
+
+- Read the [[Markdown Guide]] for formatting
+- Explore [[Knowledge Management]] best practices
+- Check out [[Project Ideas]] for inspiration
+
+#getting-started #tutorial
+`,
+  'Markdown Guide.md': `# Markdown Guide
+
+Notework supports full **GitHub Flavored Markdown**. Here's a quick reference.
+
+## Text Formatting
+
+- **Bold**: \`**text**\`
+- *Italic*: \`*text*\`
+- ~~Strikethrough~~: \`~~text~~\`
+- \`Code\`: \`\` \`code\` \`\`
+
+## Lists
+
+- [x] Completed task
+- [ ] Incomplete task
+
+## Code Blocks
+
+\`\`\`javascript
+function greet(name) {
+  return \`Hello, \${name}!\`;
+}
+\`\`\`
+
+## Blockquotes
+
+> "The only true wisdom is in knowing you know nothing."
+> — Socrates
+
+See also: [[Getting Started]], [[Knowledge Management]]
+
+#markdown #reference #guide
+`,
+  'Knowledge Management.md': `# Knowledge Management
+
+Effective knowledge management is about **capturing, connecting, and retrieving** information efficiently.
+
+## The Zettelkasten Method
+
+1. **Atomic notes**: Each note captures one idea
+2. **Connections**: Notes link to related concepts
+3. **Emergence**: Insights emerge from the network
+
+## Best Practices
+
+- **Write for your future self**: Be clear and specific
+- **One idea per note**: Keep notes focused
+- **Link liberally**: More connections = more insights
+
+## Related
+
+- [[Welcome]]
+- [[Markdown Guide]]
+- [[Project Ideas]]
+
+#knowledge-management #zettelkasten #productivity
+`,
+  'Project Ideas.md': `# Project Ideas
+
+A collection of project ideas for your [[Knowledge Management]] system.
+
+## Software Projects
+
+- [ ] Personal Dashboard
+- [ ] CLI Tools
+- [ ] Open Source Contributions
+
+## Learning Goals
+
+- [ ] Learn Rust
+- [ ] Explore Haskell
+- [ ] Machine learning basics
+
+Related: [[Knowledge Management]], [[Welcome]]
+
+#projects #ideas #planning
+`,
+};
+
+/** Extract [[wiki-links]] from content */
+function extractLinks(content: string): string[] {
+  const regex = /\[\[([^\]]+)\]\]/g;
+  const links: string[] = [];
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    links.push(match[1].trim());
+  }
+  return [...new Set(links)];
+}
+
+/** Extract #tags from content */
+function extractTags(content: string): string[] {
+  const regex = /(?:^|\s)#([a-zA-Z][a-zA-Z0-9_-]*)/g;
+  const tags: string[] = [];
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    tags.push(match[1]);
+  }
+  return [...new Set(tags)];
+}
+
+function getBasename(path: string): string {
+  return path.split('/').pop() || path;
+}
+
+/** Build file tree from mock files */
+function buildFileTree(): any[] {
+  const tree: any[] = [];
+  const dirs: Record<string, any[]> = { '': tree };
+
+  // Sort paths to ensure directories come before their contents
+  const paths = Object.keys(mockFiles).sort();
+
+  for (const filePath of paths) {
+    const parts = filePath.split('/');
+    const fileName = parts.pop()!;
+    const dirPath = parts.join('/');
+
+    // Ensure directory entries exist
+    let currentPath = '';
+    for (const part of parts) {
+      const parentPath = currentPath;
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      if (!dirs[currentPath]) {
+        const dirEntry = {
+          name: part,
+          path: currentPath,
+          absolutePath: `/mock-vault/${currentPath}`,
+          isDirectory: true,
+          extension: '',
+          children: [] as any[],
+          modifiedAt: Date.now(),
+          size: 0,
+        };
+        dirs[currentPath] = dirEntry.children;
+        (dirs[parentPath] || tree).push(dirEntry);
+      }
+    }
+
+    const fileEntry = {
+      name: fileName,
+      path: filePath,
+      absolutePath: `/mock-vault/${filePath}`,
+      isDirectory: false,
+      extension: '.md',
+      modifiedAt: Date.now(),
+      size: mockFiles[filePath].length,
+    };
+    (dirs[dirPath] || tree).push(fileEntry);
+  }
+
+  return tree;
+}
+
+export function createMockAPI(): ElectronAPI {
+  // Initialize with sample notes
+  Object.assign(mockFiles, SAMPLE_NOTES);
+
+  const mockAPI: ElectronAPI = {
+    // Vault
+    openVaultDialog: async () => {
+      mockVaultPath = '/mock-vault';
+      return '/mock-vault';
+    },
+    setVaultPath: async (path: string) => {
+      mockVaultPath = path;
+      return true;
+    },
+    getVaultPath: async () => mockVaultPath,
+
+    // File operations
+    listFiles: async (dirPath?: string) => {
+      const tree = buildFileTree();
+      if (!dirPath) return tree;
+      // Find the subdirectory
+      const findDir = (entries: any[], path: string): any[] => {
+        for (const entry of entries) {
+          if (entry.path === path && entry.isDirectory) return entry.children || [];
+          if (entry.children) {
+            const found = findDir(entry.children, path);
+            if (found.length) return found;
+          }
+        }
+        return [];
+      };
+      return findDir(tree, dirPath);
+    },
+
+    readFile: async (filePath: string) => {
+      return mockFiles[filePath] || '';
+    },
+
+    writeFile: async (filePath: string, content: string) => {
+      mockFiles[filePath] = content;
+    },
+
+    createFile: async (filePath: string, content?: string) => {
+      if (!mockFiles[filePath]) {
+        mockFiles[filePath] = content || '';
+      }
+    },
+
+    deleteFile: async (filePath: string) => {
+      delete mockFiles[filePath];
+    },
+
+    renameFile: async (oldPath: string, newPath: string) => {
+      if (mockFiles[oldPath] !== undefined) {
+        mockFiles[newPath] = mockFiles[oldPath];
+        delete mockFiles[oldPath];
+      }
+    },
+
+    createDirectory: async (_dirPath: string) => {
+      // Directories are implicit in our mock
+    },
+
+    deleteDirectory: async (dirPath: string) => {
+      for (const key of Object.keys(mockFiles)) {
+        if (key.startsWith(dirPath + '/')) {
+          delete mockFiles[key];
+        }
+      }
+    },
+
+    fileExists: async (filePath: string) => {
+      return filePath in mockFiles;
+    },
+
+    getFileTree: async () => buildFileTree(),
+
+    // Search
+    search: async (query: string) => {
+      if (!query.trim()) return [];
+      const q = query.toLowerCase();
+      return Object.entries(mockFiles)
+        .filter(([path, content]) =>
+          path.toLowerCase().includes(q) || content.toLowerCase().includes(q)
+        )
+        .map(([path, content]) => ({
+          path,
+          name: path.replace(/\.md$/, ''),
+          matches: [{
+            key: 'content',
+            indices: [[0, 0]] as readonly [number, number][],
+            value: content.substring(0, 200),
+          }],
+          score: path.toLowerCase().includes(q) ? 0.1 : 0.5,
+        }))
+        .slice(0, 20);
+    },
+
+    rebuildIndex: async () => {},
+
+    // Graph
+    getGraphData: async () => {
+      const nodes: Map<string, any> = new Map();
+      const edges: any[] = [];
+
+      for (const [filePath, content] of Object.entries(mockFiles)) {
+        const name = getBasename(filePath).replace(/\.md$/, '');
+        const key = name.toLowerCase();
+        if (!nodes.has(key)) {
+          nodes.set(key, { id: key, name, path: filePath, connections: 0 });
+        }
+
+        const links = extractLinks(content);
+        for (const linkTarget of links) {
+          const targetKey = linkTarget.toLowerCase();
+          if (!nodes.has(targetKey)) {
+            nodes.set(targetKey, { id: targetKey, name: linkTarget, path: '', connections: 0 });
+          }
+          edges.push({ source: key, target: targetKey });
+          nodes.get(key)!.connections++;
+          nodes.get(targetKey)!.connections++;
+        }
+      }
+
+      return { nodes: Array.from(nodes.values()), edges };
+    },
+
+    getBacklinks: async (filePath: string) => {
+      const targetName = getBasename(filePath).replace(/\.md$/, '');
+      const backlinks: string[] = [];
+      for (const [path, content] of Object.entries(mockFiles)) {
+        if (path === filePath) continue;
+        const links = extractLinks(content);
+        if (links.some(l => l.toLowerCase() === targetName.toLowerCase())) {
+          backlinks.push(path);
+        }
+      }
+      return backlinks;
+    },
+
+    // Window controls (no-op in browser)
+    minimizeWindow: () => {},
+    maximizeWindow: () => {},
+    closeWindow: () => {},
+    isMaximized: async () => false,
+
+    // Menu events (no-op in browser)
+    onMenuEvent: (_channel: string, _callback: (...args: any[]) => void) => {},
+    removeMenuListener: (_channel: string) => {},
+
+    // Daily note
+    createDailyNote: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const fileName = `Daily Notes/${today}.md`;
+      if (!mockFiles[fileName]) {
+        mockFiles[fileName] = `# ${today}\n\n## Tasks\n\n- [ ] \n\n## Notes\n\n\n`;
+      }
+      return fileName;
+    },
+
+    // Tags
+    getAllTags: async () => {
+      const tagMap: Record<string, string[]> = {};
+      for (const [filePath, content] of Object.entries(mockFiles)) {
+        const tags = extractTags(content);
+        for (const tag of tags) {
+          if (!tagMap[tag]) tagMap[tag] = [];
+          tagMap[tag].push(filePath);
+        }
+      }
+      return tagMap;
+    },
+  };
+
+  return mockAPI;
+}
