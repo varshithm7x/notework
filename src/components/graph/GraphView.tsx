@@ -12,6 +12,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import { Network } from 'lucide-react';
 import { GraphData, GraphNode, GraphEdge } from '../../types';
 import { getAPI } from '../../utils/api';
 
@@ -93,11 +94,21 @@ export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
       .attr('stop-color', '#6c63ff')
       .attr('stop-opacity', 0);
 
+    // Color palette for nodes
+    const colors = ['#60a5fa', '#f472b6', '#34d399', '#fbbf24', '#c084fc', '#38bdf8', '#818cf8'];
+    const getColor = (name: string) => {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      return colors[Math.abs(hash) % colors.length];
+    };
+
     // Draw edges
     const link = g.selectAll('.graph-link')
       .data(graphData.edges)
       .join('line')
-      .attr('class', 'graph-link');
+      .attr('class', 'graph-link')
+      .attr('stroke', 'rgba(150, 150, 170, 0.2)')
+      .attr('stroke-width', 1);
 
     // Draw nodes
     const node = g.selectAll('.graph-node')
@@ -120,47 +131,43 @@ export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
           d.fy = null;
         }) as any);
 
-    // Node glow effect
-    node.append('circle')
-      .attr('r', (d: GraphNode) => Math.max(20, 8 + d.connections * 3))
-      .attr('fill', 'url(#nodeGlow)')
-      .attr('opacity', 0.5);
-
     // Node circle
     node.append('circle')
-      .attr('r', (d: GraphNode) => Math.max(6, 4 + d.connections * 1.5))
-      .attr('fill', (d: GraphNode) => d.path ? '#22223a' : 'transparent')
-      .attr('stroke', (d: GraphNode) => d.path ? '#6c63ff' : '#6868a0')
-      .attr('stroke-width', 1.5)
+      .attr('r', (d: GraphNode) => Math.max(5, 3 + Math.sqrt(d.connections) * 3))
+      .attr('fill', (d: GraphNode) => d.path ? getColor(d.name) : '#2a2a42')
+      .attr('stroke', (d: GraphNode) => d.path ? 'transparent' : '#484868')
+      .attr('stroke-width', 1)
       .attr('stroke-dasharray', (d: GraphNode) => d.path ? 'none' : '4 2')
       .style('cursor', 'pointer')
       .on('click', (_event: any, d: GraphNode) => {
         onNodeClick(d.name);
       })
-      .on('mouseover', function(this: SVGCircleElement) {
+      .on('mouseover', function(this: SVGCircleElement, _event: any, d: GraphNode) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr('fill', '#6c63ff')
-          .attr('stroke-width', 2.5);
+          .attr('r', Math.max(7, 5 + Math.sqrt(d.connections) * 3))
+          .attr('fill', d.path ? d3.rgb(getColor(d.name)).brighter(0.5).toString() : '#484868');
       })
       .on('mouseout', function(this: SVGCircleElement, _event: any, d: GraphNode) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr('fill', d.path ? '#22223a' : 'transparent')
-          .attr('stroke-width', 1.5);
+          .attr('r', Math.max(5, 3 + Math.sqrt(d.connections) * 3))
+          .attr('fill', d.path ? getColor(d.name) : '#2a2a42');
       });
 
     // Node labels
     node.append('text')
       .text((d: GraphNode) => d.name)
-      .attr('dy', (d: GraphNode) => Math.max(6, 4 + d.connections * 1.5) + 14)
+      .attr('dy', (d: GraphNode) => Math.max(5, 3 + Math.sqrt(d.connections) * 3) + 14)
       .attr('text-anchor', 'middle')
-      .attr('font-size', '11px')
-      .attr('fill', '#9898b0')
+      .attr('font-size', '10px')
+      .attr('fill', '#d1d5db')
+      .attr('font-weight', '500')
       .attr('font-family', 'Inter, sans-serif')
-      .style('pointer-events', 'none');
+      .style('pointer-events', 'none')
+      .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)');
 
     // Update positions on tick
     simulation.on('tick', () => {
@@ -205,8 +212,8 @@ export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
   return (
     <>
       <div className="graph-header">
-        <h2>
-          <span style={{ opacity: 0.6 }}>🕸️</span>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Network size={20} strokeWidth={1.5} style={{ opacity: 0.6 }} />
           Graph View
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -226,7 +233,9 @@ export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
           </div>
         ) : graphData && graphData.nodes.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🕸️</div>
+            <div className="empty-icon" style={{ opacity: 0.5, marginBottom: '0.5rem' }}>
+              <Network size={48} strokeWidth={1} />
+            </div>
             <div className="empty-text">No notes to visualize yet</div>
           </div>
         ) : (

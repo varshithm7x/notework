@@ -17,6 +17,8 @@ import { BacklinksPanel } from './components/BacklinksPanel';
 import { StatusBar } from './components/StatusBar';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { Modal } from './components/Modal';
+import { Ribbon } from './components/Ribbon';
+import { FileText } from 'lucide-react';
 import { Tab, ViewMode, Theme, Command, FileEntry } from './types';
 import { getNoteName, generateId, debounce } from './utils/helpers';
 import { getAPI } from './utils/api';
@@ -188,7 +190,7 @@ export default function App() {
       title: 'New Note',
       message: 'Enter note name:',
       onConfirm: async (name) => {
-        if (!name) return;
+        if (typeof name !== 'string' || !name.trim()) return;
 
         const fileName = name.endsWith('.md') ? name : `${name}.md`;
         const content = `# ${name.replace('.md', '')}\n\n`;
@@ -342,7 +344,7 @@ export default function App() {
       title: 'New Folder',
       message: 'Enter folder name:',
       onConfirm: async (name) => {
-        if (!name) return;
+        if (typeof name !== 'string' || !name.trim()) return;
         
         const folderPath = parentPath ? `${parentPath}/${name}` : name;
         await api.createDirectory(folderPath);
@@ -381,6 +383,15 @@ export default function App() {
       <TitleBar theme={theme} />
       
       <div className="app-body">
+        {vaultPath && (
+          <Ribbon
+            onNewNote={handleNewNote}
+            onSearch={() => setShowSearch(true)}
+            onGraph={() => setShowGraph(g => !g)}
+            onCommandPalette={() => setShowCommandPalette(true)}
+            onSettings={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+          />
+        )}
         <Sidebar
           visible={showSidebar}
           fileTree={fileTree}
@@ -423,7 +434,7 @@ export default function App() {
             />
           ) : (
             <div className="empty-state">
-              <div className="empty-icon">📝</div>
+              <div className="empty-icon"><FileText size={48} strokeWidth={1} color="var(--text-muted)" /></div>
               <div className="empty-text">Select a note or create a new one</div>
             </div>
           )}

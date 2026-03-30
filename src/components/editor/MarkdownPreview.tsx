@@ -8,7 +8,11 @@
 
 import React, { useMemo, useEffect, useRef } from 'react';
 import { marked } from 'marked';
+import markedKatex from 'marked-katex-extension';
 import DOMPurify from 'dompurify';
+
+// Enable math formatting
+marked.use(markedKatex({ throwOnError: false }));
 
 interface MarkdownPreviewProps {
   content: string;
@@ -40,10 +44,10 @@ export function MarkdownPreview({ content, onLinkClick }: MarkdownPreviewProps) 
       breaks: true,
     }) as string;
 
-    // Sanitize to prevent XSS, but allow our custom attributes
+    // Sanitize to prevent XSS, but allow our custom attributes and katex math elements
     return DOMPurify.sanitize(html, {
       ADD_ATTR: ['data-link', 'data-tag'],
-      ADD_TAGS: ['span'],
+      ADD_TAGS: ['span', 'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'mspace', 'msqrt', 'mfrac', 'table', 'tbody', 'tr', 'mtd', 'mtr', 'annotation'],
     });
   }, [content]);
 

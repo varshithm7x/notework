@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
+import { ChevronRight, Folder, FolderOpen, FileText, FilePlus, FolderPlus, RefreshCw, FileEdit, Trash2 } from 'lucide-react';
 import { FileEntry } from '../types';
 import { getNoteName } from '../utils/helpers';
 import { getAPI } from '../utils/api';
@@ -126,11 +127,15 @@ export function Sidebar({
             onDragLeave={entry.isDirectory ? handleDragLeave : undefined}
             onDrop={entry.isDirectory ? (e) => handleDrop(e, entry.path) : undefined}
           >
-            {entry.isDirectory && (
-              <span className={`chevron ${isExpanded ? 'open' : ''}`}>▶</span>
+            {entry.isDirectory ? (
+              <span className={`chevron ${isExpanded ? 'open' : ''}`}>
+                <ChevronRight size={14} strokeWidth={2} />
+              </span>
+            ) : (
+              <span className="chevron-placeholder" style={{ width: 14 }}></span>
             )}
             <span className={`icon ${entry.isDirectory ? 'folder-icon' : ''}`}>
-              {entry.isDirectory ? (isExpanded ? '📂' : '📁') : '📄'}
+              {entry.isDirectory ? (isExpanded ? <FolderOpen size={16} strokeWidth={1.5} /> : <Folder size={16} strokeWidth={1.5} />) : <FileText size={16} strokeWidth={1.5} />}
             </span>
             {isRenaming ? (
               <form onSubmit={handleRenameSubmit} style={{ flex: 1 }}>
@@ -169,21 +174,21 @@ export function Sidebar({
               onClick={onNewNote}
               title="New Note"
             >
-              ✚
+              <FilePlus size={16} strokeWidth={1.5} />
             </button>
             <button
               className="sidebar-btn"
               onClick={() => onNewFolder('')}
               title="New Folder"
             >
-              📁
+              <FolderPlus size={16} strokeWidth={1.5} />
             </button>
             <button
               className="sidebar-btn"
               onClick={onRefresh}
               title="Refresh"
             >
-              ↻
+              <RefreshCw size={16} strokeWidth={1.5} />
             </button>
           </div>
         </div>
@@ -198,7 +203,9 @@ export function Sidebar({
             renderFileTree(fileTree)
           ) : (
             <div className="empty-state" style={{ padding: '2rem 1rem' }}>
-              <div style={{ fontSize: '24px', opacity: 0.3 }}>📂</div>
+              <div style={{ opacity: 0.5, marginBottom: '0.5rem' }}>
+                <FolderOpen size={48} strokeWidth={1} />
+              </div>
               <div className="empty-text" style={{ textAlign: 'center' }}>
                 No files yet.<br />Create a new note to get started.
               </div>
@@ -224,21 +231,21 @@ export function Sidebar({
                 className="context-menu-item"
                 onClick={() => { onFileSelect(contextMenu.path); closeContextMenu(); }}
               >
-                📄 Open
+                <FileText size={14} style={{ marginRight: 8 }} /> Open
               </button>
             )}
             <button
               className="context-menu-item"
               onClick={() => startRename(contextMenu.path)}
             >
-              ✏️ Rename
+              <FileEdit size={14} style={{ marginRight: 8 }} /> Rename
             </button>
             {contextMenu.isDir && (
               <button
                 className="context-menu-item"
                 onClick={() => { onNewFolder(contextMenu.path); closeContextMenu(); }}
               >
-                📁 New Subfolder
+                <FolderPlus size={14} style={{ marginRight: 8 }} /> New Subfolder
               </button>
             )}
             <div className="context-menu-separator" />
@@ -249,7 +256,7 @@ export function Sidebar({
                 closeContextMenu();
               }}
             >
-              🗑️ Delete
+              <Trash2 size={14} style={{ marginRight: 8 }} /> Delete
             </button>
           </div>
         </>

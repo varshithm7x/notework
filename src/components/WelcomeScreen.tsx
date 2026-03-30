@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { FolderOpen, Plus } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onOpenVault: () => void;
@@ -21,11 +22,11 @@ export function WelcomeScreen({ onOpenVault }: WelcomeScreenProps) {
         notes as a connected graph — all stored securely on your device.
       </p>
       <div className="welcome-actions">
-        <button className="btn btn-primary" onClick={onOpenVault}>
-          📂 Open Vault
+        <button className="btn btn-primary" onClick={onOpenVault} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FolderOpen size={18} strokeWidth={2} /> Open Vault
         </button>
-        <button className="btn btn-secondary" onClick={onOpenVault}>
-          ✨ Create New Vault
+        <button className="btn btn-secondary" onClick={onOpenVault} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Plus size={18} strokeWidth={2} /> Create New Vault
         </button>
       </div>
     </div>
