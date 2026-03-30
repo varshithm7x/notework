@@ -592,7 +592,7 @@ body {
   font-weight: 600;
   margin-top: var(--space-8);
   margin-bottom: var(--space-4);
-  color: var(--text-link); /* As in screenshot */
+  color: var(--text-primary);
   letter-spacing: -0.3px;
 }
 
@@ -601,7 +601,7 @@ body {
   font-weight: 600;
   margin-top: var(--space-6);
   margin-bottom: var(--space-3);
-  color: var(--text-link);
+  color: var(--text-primary);
 }
 
 .markdown-preview p {
@@ -1486,3 +1486,106 @@ body {
 .toast.success { border-left: 3px solid var(--success); }
 .toast.error { border-left: 3px solid var(--danger); }
 .toast.info { border-left: 3px solid var(--info); }
+
+/* ── Split Pane Resizer ───────────────────────────── */
+.resizer {
+  position: relative;
+  width: 4px;
+  background-color: transparent;
+  cursor: col-resize;
+  transition: background-color 0.2s ease;
+  z-index: 10;
+}
+
+.resizer::after {
+  content: "";
+  position: absolute;
+  top: 0; 
+  left: 1px; 
+  bottom: 0;
+  width: 1px;
+  background-color: var(--border-subtle);
+}
+
+.resizer:hover, .resizer:active, .resizer.dragging {
+  background-color: var(--accent-primary);
+}
+
+/* ── Editor Syntax (No one-dark mismatch) ───────── */
+.cm-editor {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+.cm-editor .cm-scroller {
+  background: transparent !important;
+}
+.tok-heading {
+  color: var(--text-primary) !important;
+  font-weight: 700;
+}
+.tok-comment {
+  color: var(--text-muted) !important;
+}
+.tok-keyword, .tok-meta {
+  color: var(--accent-primary) !important;
+}
+.tok-string, .tok-number {
+  color: var(--success) !important;
+}
+.cm-activeLine {
+  background-color: var(--bg-hover) !important;
+}
+.cm-selectionBackground {
+  background-color: var(--accent-glow) !important;
+}
+
+/* ── CodeMirror Search Panel Overrides ──────────── */
+.cm-panel.cm-search {
+  position: absolute !important;
+  top: 16px !important;
+  right: 32px !important;
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 12px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  font-family: inherit !important;
+  z-index: 100 !important;
+}
+
+.cm-panel.cm-search input {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+  padding: 4px 8px !important;
+  border-radius: var(--radius-sm) !important;
+  outline: none !important;
+}
+
+.cm-panel.cm-search button {
+  background: var(--bg-hover) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-secondary) !important;
+  cursor: pointer !important;
+  padding: 4px 10px !important;
+  border-radius: var(--radius-sm) !important;
+  text-transform: capitalize !important;
+  font-size: 12px !important;
+}
+
+.cm-panel.cm-search button:hover {
+  background: var(--accent-glow) !important;
+  color: var(--text-primary) !important;
+}
+
+.cm-panel.cm-search label {
+  color: var(--text-muted) !important;
+  font-size: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}

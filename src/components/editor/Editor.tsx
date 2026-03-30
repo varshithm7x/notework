@@ -144,8 +144,32 @@ export function Editor({
   onViewModeChange, onLinkClick
 }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const contentRef = useRef(content);
+  
+  const [editorWidth, setEditorWidth] = useState(50); // percentage
+
+  // Resizer logic
+  const handleDrag = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+    if (newWidth > 15 && newWidth < 85) setEditorWidth(newWidth);
+  }, []);
+
+  const stopDrag = useCallback(() => {
+    document.removeEventListener('mousemove', handleDrag);
+    document.removeEventListener('mouseup', stopDrag);
+    document.body.style.cursor = 'default';
+  }, [handleDrag]);
+
+  const startDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('mouseup', stopDrag);
+    document.body.style.cursor = 'col-resize';
+  }, [handleDrag, stopDrag]);
 
   // Keep contentRef in sync
   useEffect(() => {
@@ -215,6 +239,12 @@ export function Editor({
           '&.cm-focused': {
             outline: 'none',
           },
+          '.cm-activeLine': {
+            backgroundColor: 'var(--bg-hover) !important',
+          },
+          '.cm-selectionBackground': {
+            backgroundColor: 'var(--accent-glow) !important',
+          }
         }),
       ],
     });
@@ -310,29 +340,46 @@ export function Editor({
       </div>
 
       {/* Editor & Preview Container */}
-      <div className="editor-container" style={{
-        display: 'flex',
-        gap: viewMode === 'split' ? '1px' : 0,
-      }}>
-        {(viewMode === 'editor' || viewMode === 'split') && (
+      <div 
+        className="editor-container" 
+        ref={containerRef}
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          height: '100%',
+        }}
+      >
+        <div
+          ref={editorRef}
+          style={{
+            flex: viewMode === 'split' ? `0 0 ${editorWidth}%` : 1,
+            height: '100%',
+            overflow: 'auto',
+            display: (viewMode === 'editor' || viewMode === 'split') ? 'block' : 'none',
+            backgroundColor: 'var(--bg-primary)'
+          }}
+        />
+
+        {viewMode === 'split' && (
           <div
-            ref={editorRef}
-            style={{
-              flex: 1,
-              overflow: 'auto',
-              borderRight: viewMode === 'split' ? '1px solid var(--border-subtle)' : 'none',
-            }}
+            className="resizer"
+            onMouseDown={startDrag}
+            style={{ width: '4px', cursor: 'col-resize' }}
           />
         )}
 
-        {(viewMode === 'preview' || viewMode === 'split') && (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <MarkdownPreview
-              content={content}
-              onLinkClick={onLinkClick}
-            />
-          </div>
-        )}
+        <div style={{ 
+          flex: viewMode === 'split' ? `0 0 calc(${100 - editorWidth}% - 4px)` : 1,
+          overflow: 'auto', 
+          height: '100%',
+          display: (viewMode === 'preview' || viewMode === 'split') ? 'block' : 'none',
+          backgroundColor: 'var(--bg-primary)'
+        }}>
+          <MarkdownPreview
+            content={content}
+            onLinkClick={onLinkClick}
+          />
+        </div>
       </div>
     </>
   );

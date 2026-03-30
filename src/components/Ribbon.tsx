@@ -1,5 +1,5 @@
 import React from 'react';
-import { FilePlus, Search, Network, Settings, TerminalSquare } from 'lucide-react';
+import { FilePlus, Search, Network, SunMoon, TerminalSquare } from 'lucide-react';
 
 interface RibbonProps {
   onNewNote: () => void;
@@ -27,8 +27,8 @@ export function Ribbon({ onNewNote, onSearch, onGraph, onCommandPalette, onSetti
         </button>
       </div>
       <div className="ribbon-bottom">
-        <button className="ribbon-btn" onClick={onSettings} title="Settings">
-          <Settings size={20} strokeWidth={1.5} />
+        <button className="ribbon-btn" onClick={onSettings} title="Toggle Theme">
+          <SunMoon size={20} strokeWidth={1.5} />
         </button>
       </div>
     </div>

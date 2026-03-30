@@ -31,9 +31,55 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>('dark');
   const [showSidebar, setShowSidebar] = useState(true);
   const [showGraph, setShowGraph] = useState(false);
+  const [graphFullScreen, setGraphFullScreen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBacklinks, setShowBacklinks] = useState(true);
+  
+  // Split pane references and dragging
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const [editorPaneWidth, setEditorPaneWidth] = useState(50);
+  
+  const handlePaneDrag = useCallback((e: MouseEvent) => {
+    if (!mainContentRef.current) return;
+    const rect = mainContentRef.current.getBoundingClientRect();
+    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+    if (newWidth > 20 && newWidth < 80) setEditorPaneWidth(newWidth);
+  }, []);
+
+  const stopPaneDrag = useCallback(() => {
+    document.removeEventListener('mousemove', handlePaneDrag);
+    document.removeEventListener('mouseup', stopPaneDrag);
+    document.body.style.cursor = 'default';
+  }, [handlePaneDrag]);
+
+  const startPaneDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    document.addEventListener('mousemove', handlePaneDrag);
+    document.addEventListener('mouseup', stopPaneDrag);
+    document.body.style.cursor = 'col-resize';
+  }, [handlePaneDrag, stopPaneDrag]);
+
+  // Sidebar drag resizer
+  const [sidebarWidth, setSidebarWidth] = useState(260);
+  
+  const handleSidebarDrag = useCallback((e: MouseEvent) => {
+    const newWidth = e.clientX - 48; // minus ribbon width
+    if (newWidth > 150 && newWidth < 600) setSidebarWidth(newWidth);
+  }, []);
+
+  const stopSidebarDrag = useCallback(() => {
+    document.removeEventListener('mousemove', handleSidebarDrag);
+    document.removeEventListener('mouseup', stopSidebarDrag);
+    document.body.style.cursor = 'default';
+  }, [handleSidebarDrag]);
+
+  const startSidebarDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    document.addEventListener('mousemove', handleSidebarDrag);
+    document.addEventListener('mouseup', stopSidebarDrag);
+    document.body.style.cursor = 'col-resize';
+  }, [handleSidebarDrag, stopSidebarDrag]);
 
   // ── File & Editor State ─────────────────────────────
   const [fileTree, setFileTree] = useState<FileEntry[]>([]);
@@ -155,13 +201,14 @@ export default function App() {
   };
 
   // ── File Operations ─────────────────────────────────
-  const openFile = async (filePath: string) => {
+  const openFile = async (filePath: string, mode?: ViewMode) => {
     // Check if tab already exists
     const existingTab = tabs.find(t => t.path === filePath);
     if (existingTab) {
       setActiveTabId(existingTab.id);
       const content = await api.readFile(filePath);
       setCurrentContent(content);
+      setViewMode(mode || 'preview');
       loadBacklinks(filePath);
       return;
     }
@@ -178,7 +225,7 @@ export default function App() {
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
     setCurrentContent(content);
-    setShowGraph(false);
+    setViewMode(mode || 'preview');
     loadBacklinks(filePath);
   };
 
@@ -284,14 +331,14 @@ export default function App() {
 
     const filePath = findNote(fileTree, linkName);
     if (filePath) {
-      await openFile(filePath);
+      await openFile(filePath, 'preview');
     } else {
       // Auto-create note if it doesn't exist
       const newPath = `${linkName}.md`;
       const content = `# ${linkName}\n\n`;
       await api.createFile(newPath, content);
       await refreshFileTree();
-      await openFile(newPath);
+      await openFile(newPath, 'preview');
     }
   };
 
@@ -382,7 +429,7 @@ export default function App() {
     <div className="app">
       <TitleBar theme={theme} />
       
-      <div className="app-body">
+      <div className="app-body" style={{ '--sidebar-width': `${sidebarWidth}px` } as any}>
         {vaultPath && (
           <Ribbon
             onNewNote={handleNewNote}
@@ -403,40 +450,77 @@ export default function App() {
           onRenameFile={handleRenameFile}
           onRefresh={refreshFileTree}
         />
+        
+        {showSidebar && vaultPath && (
+          <div
+            className="resizer"
+            onMouseDown={startSidebarDrag}
+            style={{ width: '4px', cursor: 'col-resize', zIndex: 100 }}
+          />
+        )}
 
-        <div className="main-content">
+        <div className="main-content" ref={mainContentRef} style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%' }}>
           {!vaultPath ? (
             <WelcomeScreen onOpenVault={handleOpenVault} />
-          ) : showGraph ? (
-            <GraphView
-              onNodeClick={handleLinkClick}
-              onClose={() => setShowGraph(false)}
-            />
-          ) : activeTab ? (
-            <Editor
-              tabs={tabs}
-              activeTabId={activeTabId!}
-              content={currentContent}
-              viewMode={viewMode}
-              onTabSelect={async (id) => {
-                setActiveTabId(id);
-                const tab = tabs.find(t => t.id === id);
-                if (tab) {
-                  const content = await api.readFile(tab.path);
-                  setCurrentContent(content);
-                  loadBacklinks(tab.path);
-                }
-              }}
-              onTabClose={closeTab}
-              onContentChange={handleContentChange}
-              onViewModeChange={setViewMode}
-              onLinkClick={handleLinkClick}
-            />
           ) : (
-            <div className="empty-state">
-              <div className="empty-icon"><FileText size={48} strokeWidth={1} color="var(--text-muted)" /></div>
-              <div className="empty-text">Select a note or create a new one</div>
-            </div>
+            <>
+              {(!showGraph || !graphFullScreen) && (
+                <div style={{ flex: (!showGraph || !activeTab || graphFullScreen) ? 1 : `0 0 ${editorPaneWidth}%`, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  {activeTab ? (
+                    <Editor
+                      tabs={tabs}
+                      activeTabId={activeTabId!}
+                      content={currentContent}
+                      viewMode={viewMode}
+                      onTabSelect={async (id) => {
+                        setActiveTabId(id);
+                        const tab = tabs.find(t => t.id === id);
+                        if (tab) {
+                          const content = await api.readFile(tab.path);
+                          setCurrentContent(content);
+                          loadBacklinks(tab.path);
+                        }
+                      }}
+                      onTabClose={closeTab}
+                      onContentChange={handleContentChange}
+                      onViewModeChange={setViewMode}
+                      onLinkClick={handleLinkClick}
+                    />
+                  ) : (
+                    <div className="empty-state">
+                      <div className="empty-icon"><FileText size={48} strokeWidth={1} color="var(--text-muted)" /></div>
+                      <div className="empty-text">Select a note or create a new one</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {!graphFullScreen && showGraph && activeTab && (
+                <div
+                  className="resizer"
+                  onMouseDown={startPaneDrag}
+                  style={{ width: '4px', cursor: 'col-resize' }}
+                />
+              )}
+              
+              {showGraph && (
+                <div style={{ 
+                  flex: graphFullScreen || !activeTab ? 1 : `0 0 calc(${100 - editorPaneWidth}% - 4px)`, 
+                  height: '100%', 
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}>
+                  <GraphView
+                    onNodeClick={handleLinkClick}
+                    onClose={() => setShowGraph(false)}
+                    isFullScreen={graphFullScreen}
+                    onToggleFullScreen={() => setGraphFullScreen(f => !f)}
+                    theme={theme}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
 

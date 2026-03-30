@@ -12,21 +12,29 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { Network } from 'lucide-react';
-import { GraphData, GraphNode, GraphEdge } from '../../types';
+import { Network, Maximize, Minimize } from 'lucide-react';
+import { GraphData, GraphNode, GraphEdge, Theme } from '../../types';
 import { getAPI } from '../../utils/api';
 
 interface GraphViewProps {
   onNodeClick: (noteName: string) => void;
   onClose: () => void;
+  isFullScreen?: boolean;
+  onToggleFullScreen?: () => void;
+  theme?: Theme;
 }
 
 const api = getAPI();
 
-export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
+export function GraphView({ onNodeClick, onClose, isFullScreen, onToggleFullScreen, theme = 'dark' }: GraphViewProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
+  const onNodeClickRef = useRef(onNodeClick);
+
+  useEffect(() => {
+    onNodeClickRef.current = onNodeClick;
+  }, [onNodeClick]);
 
   // Fetch graph data
   useEffect(() => {
@@ -132,42 +140,45 @@ export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
         }) as any);
 
     // Node circle
+    // Cap radius at 30 to prevent excessively large nodes
+    const calculateRadius = (d: GraphNode) => Math.min(30, 5 + Math.sqrt(d.connections) * 4);
+
     node.append('circle')
-      .attr('r', (d: GraphNode) => Math.max(5, 3 + Math.sqrt(d.connections) * 3))
+      .attr('r', calculateRadius)
       .attr('fill', (d: GraphNode) => d.path ? getColor(d.name) : '#2a2a42')
       .attr('stroke', (d: GraphNode) => d.path ? 'transparent' : '#484868')
       .attr('stroke-width', 1)
       .attr('stroke-dasharray', (d: GraphNode) => d.path ? 'none' : '4 2')
       .style('cursor', 'pointer')
       .on('click', (_event: any, d: GraphNode) => {
-        onNodeClick(d.name);
+        onNodeClickRef.current(d.name);
       })
       .on('mouseover', function(this: SVGCircleElement, _event: any, d: GraphNode) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr('r', Math.max(7, 5 + Math.sqrt(d.connections) * 3))
+          .attr('r', calculateRadius(d) + 3)
           .attr('fill', d.path ? d3.rgb(getColor(d.name)).brighter(0.5).toString() : '#484868');
       })
       .on('mouseout', function(this: SVGCircleElement, _event: any, d: GraphNode) {
         d3.select(this)
           .transition()
           .duration(200)
-          .attr('r', Math.max(5, 3 + Math.sqrt(d.connections) * 3))
+          .attr('r', calculateRadius(d))
           .attr('fill', d.path ? getColor(d.name) : '#2a2a42');
       });
 
     // Node labels
     node.append('text')
       .text((d: GraphNode) => d.name)
-      .attr('dy', (d: GraphNode) => Math.max(5, 3 + Math.sqrt(d.connections) * 3) + 14)
+      .attr('dy', (d: GraphNode) => calculateRadius(d) + 14)
       .attr('text-anchor', 'middle')
       .attr('font-size', '10px')
-      .attr('fill', '#d1d5db')
+      .attr('fill', theme === 'dark' ? '#d1d5db' : '#374151')
       .attr('font-weight', '500')
       .attr('font-family', 'Inter, sans-serif')
       .style('pointer-events', 'none')
-      .style('text-shadow', '0 1px 3px rgba(0,0,0,0.8)');
+      .style('text-shadow', theme === 'dark' ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 3px rgba(255,255,255,0.8)');
 
     // Update positions on tick
     simulation.on('tick', () => {
@@ -190,7 +201,7 @@ export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
     return () => {
       simulation.stop();
     };
-  }, [graphData, onNodeClick]);
+  }, [graphData]);
 
   // Zoom controls
   const handleZoomIn = () => {
@@ -221,6 +232,11 @@ export function GraphView({ onNodeClick, onClose }: GraphViewProps) {
             <span>{graphData?.nodes.length || 0} nodes</span>
             <span>{graphData?.edges.length || 0} connections</span>
           </div>
+          {onToggleFullScreen && (
+            <button className="btn btn-ghost" onClick={onToggleFullScreen} style={{ display: 'inline-flex', padding: '6px' }} title="Toggle Full Screen">
+              {isFullScreen ? <Minimize size={16} /> : <Maximize size={16} />}
+            </button>
+          )}
           <button className="btn btn-ghost" onClick={onClose}>✕ Close</button>
         </div>
       </div>
