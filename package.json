@@ -29,7 +29,6 @@
     "@lezer/highlight": "^1.2.1",
     "d3": "^7.9.0",
     "dompurify": "^3.2.6",
-    "electron": "^35.1.2",
     "fuse.js": "^7.1.0",
     "marked": "^15.0.8",
     "react": "^19.1.0",
@@ -43,6 +42,7 @@
     "@types/react-dom": "^19.1.1",
     "@vitejs/plugin-react": "^4.4.1",
     "concurrently": "^9.1.2",
+    "electron": "^35.1.2",
     "electron-builder": "^26.0.12",
     "typescript": "^5.8.2",
     "vite": "^6.3.1",
@@ -51,12 +51,38 @@
   "build": {
     "appId": "com.notework.app",
     "productName": "Notework",
+    "copyright": "Copyright © 2026 Notework",
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
-    ]
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "public/icons"
+    },
+    "deb": {
+      "priority": "optional",
+      "afterInstall": "scripts/linux/after-install.sh"
+    }
   }
 }
