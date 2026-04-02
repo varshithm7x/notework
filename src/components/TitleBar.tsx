@@ -20,8 +20,8 @@ export function TitleBar({ theme }: TitleBarProps) {
   return (
     <div className="titlebar">
       <div className="titlebar-title">
-        <span className="logo">N</span>
-        Notework
+        <span className="logo">Nyx</span>
+        Nyx
       </div>
 
       {!isMac && (

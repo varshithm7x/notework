@@ -196,7 +196,7 @@ body {
 }
 
 .titlebar-title .logo {
-  width: 18px;
+  padding: 0 4px;
   height: 18px;
   background: var(--accent-gradient);
   border-radius: var(--radius-sm);
@@ -1098,7 +1098,7 @@ body {
 }
 
 .welcome-logo {
-  width: 80px;
+  padding: 0 24px;
   height: 80px;
   background: var(--accent-gradient);
   border-radius: var(--radius-xl);

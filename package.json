@@ -1,5 +1,5 @@
 {
-  "name": "notework",
+  "name": "nyx",
   "version": "1.0.0",
   "description": "A local-first knowledge management tool with graph-based note linking",
   "main": "dist-electron/main.js",
@@ -49,9 +49,9 @@
     "wait-on": "^8.0.3"
   },
   "build": {
-    "appId": "com.notework.app",
-    "productName": "Notework",
-    "copyright": "Copyright © 2026 Notework",
+    "appId": "com.nyx.app",
+    "productName": "Nyx",
+    "copyright": "Copyright © 2026 Nyx",
     "directories": {
       "output": "release"
     },
